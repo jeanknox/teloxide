@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use reqwest;
 
 use teloxide::{prelude::*, utils::command:: BotCommands};
@@ -11,18 +11,19 @@ async fn main(){
     Command::repl(bot, answer).await;
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Serialize)]
 struct Feriado{
     date: String,
     name: String,
     #[serde(rename(deserialize="type"))]
     tipo: String}
 
-async fn get_feriados(ano: String) -> Result<(), reqwest::Error>{
+async fn get_feriados(ano: String) -> Vec<Feriado> {
     let request_url = format!("https://brasilapi.com.br/api/feriados/v1/{ano}");
     let client = reqwest::Client::new();
     let start = std::time::Instant::now();
     let feriados: Vec<Feriado> = client.get(request_url).send().await?.json().await?;
+    feriados
 }    
 
 #[derive(BotCommands, Clone)]
@@ -45,9 +46,12 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()>{
         Command::UsernameAndAge { username, age} => {
             bot.send_message(msg.chat.id, format!("Your username is @{username}, and your age is {age}.")).await?
         }
-        Command::Feriados(feriado) => {
-            bot.send_message(msg.chat.id, get_feriados(feriado)).await?
-        }
+        Command::Feriados(ano) => {
+            let feriados = get_feriados(ano);
+            for feriado in feriados.await.iter(){
+                bot.send_message(msg.chat.id, feriado).await?;
+            }
+        },
     };
     Ok(())
 }
